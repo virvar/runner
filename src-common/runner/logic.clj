@@ -11,8 +11,8 @@
 (def start-time (atom 0))
 (def best-score (atom 0))
 (def block-creation-rate 0.25)
-(def block-creation-interval 0.5)
-(def last-block-created-time (atom 0))
+(def block-creation-interval 300)
+(def distance (atom 0))
 
 (defn- correct-player-position
   [player]
@@ -31,26 +31,28 @@
                            (= direction :left) (assoc :x (- (:x entity) distance)))]
     (correct-player-position new-entity)))
 
-(defn- move-blocks-and-background
-  [entities direction delta]
-  (let [distance (* velocity delta)]
+(defn- move-world!
+  [entities direction delta-time]
+  (let [delta-length (* velocity delta-time)
+        delta (cond
+               (= direction :right) delta-length
+               (= direction :left) (- delta-length))]
+    (swap! distance #(+ % delta))
     (map (fn [entity]
            (if (or (:block? entity)
                    (:background? entity))
-             (cond-> entity
-                     (= direction :right) (assoc :x (- (:x entity) distance))
-                     (= direction :left) (assoc :x (+ (:x entity) distance)))
+             (update entity :x #(- % delta))
              entity))
          entities)))
 
-(defn- handle-input
+(defn- handle-input!
   [screen entities]
   (let [delta-time (:delta-time screen)]
     (cond-> entities
             (key-pressed? :dpad-left)
-            (move-blocks-and-background :left delta-time)
+            (move-world! :left delta-time)
             (key-pressed? :dpad-right)
-            (move-blocks-and-background :right delta-time))))
+            (move-world! :right delta-time))))
 
 (defn- move-block
   [entity delta-time]
@@ -103,11 +105,12 @@
 
 (defn- create-block-rand!
   [screen]
-  (swap! last-block-created-time #(+ % (:delta-time screen)))
-  (if (< block-creation-interval @last-block-created-time)
+  (let [delta-x (* block-velocity (:delta-time screen))]
+    (swap! distance #(+ % delta-x)))
+  (if (< block-creation-interval @distance)
     (if (< (rand) block-creation-rate)
       (do
-        (reset! last-block-created-time 0)
+        (reset! distance 0)
         (create-block 15 (+ (rand-int 5) 1)))
       nil)
     nil))
@@ -153,7 +156,7 @@
           (create-background (game :width))
           (create-score-panel)
           (create-best-score-panel)
-          (create-player 4 1)))
+          (create-player 3 1)))
 
 (defn update-game!
   [screen entities]
@@ -164,7 +167,7 @@
       (let [new-entities (filterv some? (->> entities
                                              (map #(as-> % entity
                                                          (handle-move screen entities entity)))
-                                             (handle-input screen)))
+                                             (handle-input! screen)))
             new-block (create-block-rand! screen)]
         (if new-block
           (conj new-entities new-block)
