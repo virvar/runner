@@ -31,11 +31,12 @@
                            (= direction :left) (assoc :x (- (:x entity) distance)))]
     (correct-player-position new-entity)))
 
-(defn- move-blocks
+(defn- move-blocks-and-background
   [entities direction delta]
   (let [distance (* velocity delta)]
     (map (fn [entity]
-           (if (:block? entity)
+           (if (or (:block? entity)
+                   (:background? entity))
              (cond-> entity
                      (= direction :right) (assoc :x (- (:x entity) distance))
                      (= direction :left) (assoc :x (+ (:x entity) distance)))
@@ -47,9 +48,9 @@
   (let [delta-time (:delta-time screen)]
     (cond-> entities
             (key-pressed? :dpad-left)
-            (move-blocks :left delta-time)
+            (move-blocks-and-background :left delta-time)
             (key-pressed? :dpad-right)
-            (move-blocks :right delta-time))))
+            (move-blocks-and-background :right delta-time))))
 
 (defn- move-block
   [entity delta-time]
